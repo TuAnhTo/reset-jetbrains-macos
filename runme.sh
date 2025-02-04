@@ -1,63 +1,38 @@
 #!/bin/bash
+# reset jetbrains ide evals v1.0.4
 
-if [ "$1" = "--prepare-env" ]; then
-  DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-  mkdir -p ~/Scripts
+OS_NAME=$(uname -s)
+JB_PRODUCTS="IntelliJIdea CLion PhpStorm GoLand PyCharm WebStorm Rider DataGrip RubyMine AppCode"
 
-  echo "Copying the script to $HOME/Scripts"
-  cp -rf $DIR/runme.sh  ~/Scripts/jetbrains-reset.sh
-  chmod +x ~/Scripts/jetbrains-reset.sh
+if [ "$OS_NAME" == "Darwin" ]; then
+  echo 'macOS:'
 
-  echo
-  echo "Copying com.jetbrains.reset.plist to $HOME/Library/LaunchAgents"
-  cp -rf $DIR/com.jetbrains.reset.plist ~/Library/LaunchAgents
+  for PRD in $JB_PRODUCTS; do
+    rm -rf ~/Library/Preferences/"${PRD}"*/eval
+    sed -i '' '/name="evlsprt.*"/d' ~/Library/Preferences/"${PRD}"*/options/other.xml >/dev/null 2>&1
+    rm -rf ~/Library/Application\ Support/JetBrains/"${PRD}"*/eval
+    sed -i '' '/name="evlsprt.*"/d' ~/Library/Application\ Support/JetBrains/"${PRD}"*/options/other.xml >/dev/null 2>&1
+  done
 
-  echo
-  echo "Loading job into launchctl"
-  launchctl load ~/Library/LaunchAgents/com.jetbrains.reset.plist
+  plutil -remove "/.JetBrains\.UserIdOnMachine" ~/Library/Preferences/com.apple.java.util.prefs.plist >/dev/null
+  plutil -remove "/.jetbrains/.user_id_on_machine" ~/Library/Preferences/com.apple.java.util.prefs.plist >/dev/null
+  plutil -remove "/.jetbrains/.device_id" ~/Library/Preferences/com.apple.java.util.prefs.plist >/dev/null
+elif [ "$OS_NAME" == "Linux" ]; then
+  echo 'Linux:'
 
-  echo
-  echo "That's it, enjoy ;)"
-  exit 0
+  for PRD in $JB_PRODUCTS; do
+    rm -rf ~/."${PRD}"*/config/eval
+    sed -i '/name="evlsprt.*"/d' ~/."${PRD}"*/config/options/other.xml >/dev/null 2>&1
+    rm -rf ~/.config/JetBrains/"${PRD}"*/eval
+    sed -i '/name="evlsprt.*"/d' ~/.config/JetBrains/"${PRD}"*/options/other.xml >/dev/null 2>&1
+  done
+
+  sed -i '/key="JetBrains\.UserIdOnMachine"/d' ~/.java/.userPrefs/prefs.xml
+  sed -i '/key="device_id"/d' ~/.java/.userPrefs/jetbrains/prefs.xml
+  sed -i '/key="user_id_on_machine"/d' ~/.java/.userPrefs/jetbrains/prefs.xml
+else
+  echo 'unsupport'
+  exit
 fi
 
-if [ "$1" = "--launch-agent" ]; then
-  PROCESS=(idea webstorm datagrip phpstorm clion pycharm goland rubymine rider)
-  COMMAND_PRE=("${PROCESS[@]/#/MacOS/}")
-
-  # Kill all Intellij applications
-  kill -9 `ps aux | egrep $(IFS=$'|'; echo "${COMMAND_PRE[*]}") | awk '{print $2}'`
-fi
-
-# Reset Intellij evaluation
-for product in IntelliJIdea WebStorm DataGrip PhpStorm CLion PyCharm GoLand RubyMine Rider; do
-  echo "Resetting trial period for $product"
-
-  echo "removing evaluation key..."
-  rm -rf ~/Library/Preferences/$product*/eval
-
-  # Above path not working on latest version. Fixed below
-  rm -rf ~/Library/Application\ Support/JetBrains/$product*/eval
-
-  echo "removing all evlsprt properties in options.xml..."
-  sed -i '' '/evlsprt/d' ~/Library/Preferences/$product*/options/other.xml
-
-  # Above path not working on latest version. Fixed below
-  sed -i '' '/evlsprt/d' ~/Library/Application\ Support/JetBrains/$product*/options/other.xml
-
-  echo
-done
-
-echo "removing additional plist files..."
-rm -f ~/Library/Preferences/com.apple.java.util.prefs.plist
-rm -f ~/Library/Preferences/com.jetbrains.*.plist
-rm -f ~/Library/Preferences/jetbrains.*.*.plist
-
-echo
-echo "That's it, enjoy ;)"
-
-# Flush preference cache
-if [ "$1" = "--launch-agent" ]; then
-  killall cfprefsd
-  echo "Evaluation was reset at $(date)" >> ~/Scripts/logs
-fi
+echo 'done.'
